@@ -1,4 +1,4 @@
-"""Run the taxi generator as a Python module."""
+"""Запуск генератора такси как модуля Python."""
 
 from generator.cli import main
 

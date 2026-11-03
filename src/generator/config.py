@@ -1,4 +1,4 @@
-"""Environment-backed configuration for the taxi generator."""
+"""Конфигурация генератора такси из переменных окружения."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class ClickHouseSettings(BaseSettings):
-    """ClickHouse connection settings using the CLICKHOUSE_ prefix."""
+    """Настройки подключения к ClickHouse с префиксом CLICKHOUSE_."""
 
     model_config = SettingsConfigDict(
         env_prefix="CLICKHOUSE_",
@@ -28,7 +28,7 @@ class ClickHouseSettings(BaseSettings):
 
 
 class GeneratorSettings(BaseSettings):
-    """Generation settings using the GENERATOR_ prefix."""
+    """Настройки генерации с префиксом GENERATOR_."""
 
     model_config = SettingsConfigDict(
         env_prefix="GENERATOR_",
@@ -54,32 +54,32 @@ class GeneratorSettings(BaseSettings):
 
     @staticmethod
     def _split_values(value: str) -> list[str]:
-        """Split a comma-separated environment value into clean items."""
+        """Разделить значение из env со списком через запятую на элементы."""
 
         return [item.strip() for item in value.split(",") if item.strip()]
 
     @property
     def city_list(self) -> list[str]:
-        """Return configured cities as a list."""
+        """Вернуть настроенные города в виде списка."""
 
         return self._split_values(self.cities)
 
     @property
     def tariff_list(self) -> list[str]:
-        """Return configured tariffs as a list."""
+        """Вернуть настроенные тарифы в виде списка."""
 
         return self._split_values(self.tariffs)
 
     @property
     def weather_type_list(self) -> list[str]:
-        """Return trip weather categories as a list."""
+        """Вернуть категории погоды поездки в виде списка."""
 
         return self._split_values(self.weather_types)
 
 
 @dataclass(frozen=True, slots=True)
 class Settings:
-    """Single access point for generator and ClickHouse settings."""
+    """Единая точка доступа к настройкам генератора и ClickHouse."""
 
     generator: GeneratorSettings
     clickhouse: ClickHouseSettings
@@ -87,6 +87,6 @@ class Settings:
 
 @lru_cache
 def get_settings() -> Settings:
-    """Build and cache the process-wide application settings."""
+    """Создать и закэшировать настройки приложения на время процесса."""
 
     return Settings(generator=GeneratorSettings(), clickhouse=ClickHouseSettings())
