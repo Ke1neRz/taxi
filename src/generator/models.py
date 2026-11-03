@@ -69,6 +69,7 @@ class Trip:
     rating: float
     cost: float
     taxist_count: int
+    is_anomaly: bool = False
 
     @property
     def travel_time_seconds(self) -> int:
