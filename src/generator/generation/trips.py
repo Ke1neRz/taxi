@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 from generator.generation.anomalies import AnomalyKind, AnomalyPolicy
 from generator.generation.catalog import TaxiCatalog
 from generator.generation.seasonality import demand_factor
-from generator.models import Trip
+from generator.models import Trip, User
 
 
 class TripBatchGenerator:
@@ -30,7 +30,7 @@ class TripBatchGenerator:
         self._next_trip_id = 1
 
     @property
-    def users(self):
+    def users(self) -> list[User]:
         """Вернуть пользователей, которых нужно записать в справочник."""
 
         return self._catalog.users()
@@ -40,7 +40,9 @@ class TripBatchGenerator:
 
         if size < 1:
             raise ValueError("batch size must be positive")
-        trips = [self._generate_trip(at + timedelta(seconds=index)) for index in range(size)]
+        trips = [
+            self._generate_trip(at + timedelta(seconds=index)) for index in range(size)
+        ]
         return trips
 
     def _generate_trip(self, start: datetime) -> Trip:
@@ -71,7 +73,8 @@ class TripBatchGenerator:
         elif anomaly is AnomalyKind.TRAFFIC_JAM:
             duration *= 1.0 + self._anomaly_policy.strength
         elif anomaly is AnomalyKind.DRIVER_SHORTAGE:
-            taxist_count = max(1, int(taxist_count / self._anomaly_policy.strength))
+            strength = max(1.0, self._anomaly_policy.strength)
+            taxist_count = max(1, int(taxist_count / strength))
 
         trip = Trip(
             id=self._next_trip_id,

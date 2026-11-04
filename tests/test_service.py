@@ -1,6 +1,6 @@
+import random
 import threading
 from datetime import UTC, datetime
-import random
 
 from generator.config import ClickHouseSettings, GeneratorSettings, Settings
 from generator.generation.anomalies import AnomalyPolicy
