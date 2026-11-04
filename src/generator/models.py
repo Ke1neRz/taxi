@@ -1,4 +1,4 @@
-"""Pure domain models for taxi users and trips."""
+"""Чистые доменные модели пользователей и поездок такси."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from enum import StrEnum
 
 
 class Tarif(StrEnum):
-    """Tariff category used as a trip dimension."""
+    """Категория тарифа как измерение поездки."""
 
     ECONOMY = "economy"
     COMFORT = "comfort"
@@ -16,7 +16,7 @@ class Tarif(StrEnum):
 
 
 class Weather(StrEnum):
-    """Weather category recorded at the time of a trip."""
+    """Категория погоды, записанная во время поездки."""
 
     CLEAR = "clear"
     CLOUDY = "cloudy"
@@ -26,7 +26,7 @@ class Weather(StrEnum):
 
 @dataclass(frozen=True, slots=True)
 class User:
-    """User directory record; taxi drivers are users with is_taxist enabled."""
+    """Запись справочника пользователей; водитель имеет is_taxist=True."""
 
     id: int
     name: str
@@ -40,8 +40,18 @@ class User:
 
 
 @dataclass(frozen=True, slots=True)
+class Route:
+    """Справочный маршрут для создания реалистичных фактов поездок."""
+
+    start_point: str
+    end_point: str
+    intermediate_point: str | None
+    distance: float
+
+
+@dataclass(frozen=True, slots=True)
 class Trip:
-    """Taxi trip fact with dimensions and metrics needed by the MVs."""
+    """Факт поездки такси с измерениями и метриками для MV."""
 
     id: int
     user_id: int
@@ -59,9 +69,10 @@ class Trip:
     rating: float
     cost: float
     taxist_count: int
+    is_anomaly: bool = False
 
     @property
     def travel_time_seconds(self) -> int:
-        """Return the non-negative trip duration in whole seconds."""
+        """Вернуть неотрицательную длительность поездки в целых секундах."""
 
         return max(0, int((self.datetime_end - self.datetime_start).total_seconds()))
