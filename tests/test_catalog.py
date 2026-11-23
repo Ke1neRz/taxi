@@ -11,12 +11,12 @@ def test_catalog_creates_related_users_and_drivers() -> None:
     )
 
     users = catalog.users()
-    drivers = catalog.drivers()
+    taxists = catalog.taxists()
 
     assert len(users) == 20
-    assert drivers
-    assert all(driver.is_taxist for driver in drivers)
-    assert {driver.id for driver in drivers} <= {user.id for user in users}
+    assert taxists
+    assert all(taxist.license_number for taxist in taxists)
+    assert all(taxist.car_model for taxist in taxists)
 
 
 def test_catalog_is_reproducible_with_seed() -> None:
@@ -39,5 +39,5 @@ def test_routes_have_positive_distance() -> None:
     catalog = TaxiCatalog(["Moscow"], ["economy"], ["clear"], user_count=10)
 
     assert catalog.routes()
-    assert all(route.distance > 0 for route in catalog.routes())
+    assert all(route.distance_km > 0 for route in catalog.routes())
     assert all(route.start_point != route.end_point for route in catalog.routes())

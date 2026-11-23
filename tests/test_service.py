@@ -49,5 +49,5 @@ def test_run_once_writes_users_and_trip_batch() -> None:
 
     assert len(repository.users) == 20
     assert len(repository.trips) == 4
-    driver_ids = {user.id for user in repository.users if user.is_taxist}
+    driver_ids = {taxist.id for taxist in repository.taxists}
     assert all(trip.taxist_id in driver_ids for trip in repository.trips)

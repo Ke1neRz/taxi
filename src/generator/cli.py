@@ -45,9 +45,7 @@ def _parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
 
     parser = argparse.ArgumentParser(prog="taxi-generator")
     parser.add_argument("--once", action="store_true", help="записать один batch и выйти")
-    parser.add_argument(
-        "--repository", choices=("in-memory", "clickhouse"), default="in-memory"
-    )
+    parser.add_argument("--repository", choices=("in-memory", "clickhouse"), default="in-memory")
     return parser.parse_args(argv)
 
 

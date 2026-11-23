@@ -68,9 +68,18 @@ class GeneratorService:
         self._produce_and_store_batch()
 
     def _write_users(self) -> None:
-        """Записать справочник пользователей через retry."""
+        """Записать статические справочники через retry."""
 
         self._retry.execute(lambda: self._repository.upsert_users(self._batch_generator.users))
+        self._retry.execute(
+            lambda: self._repository.upsert_taxists(self._batch_generator.taxists)
+        )
+        self._retry.execute(
+            lambda: self._repository.upsert_tarifs(self._batch_generator.tarifs)
+        )
+        self._retry.execute(
+            lambda: self._repository.upsert_weathers(self._batch_generator.weathers)
+        )
 
     def _produce_and_store_batch(self) -> None:
         """Создать и записать один batch поездок, соблюдая интервал."""
@@ -79,6 +88,16 @@ class GeneratorService:
         batch = self._batch_generator.generate_batch(
             self._clock(), self._settings.generator.batch_size
         )
+        dates = {}
+        times = {}
+        for trip in batch:
+            date_dimension, time_dimension = self._batch_generator.dimensions_for(
+                trip.datetime_start
+            )
+            dates[date_dimension.id] = date_dimension
+            times[time_dimension.id] = time_dimension
+        self._retry.execute(lambda: self._repository.upsert_dates(list(dates.values())))
+        self._retry.execute(lambda: self._repository.upsert_times(list(times.values())))
         self._retry.execute(lambda: self._repository.insert_trips(batch))
         logger.info(
             "Записано поездок: %d, аномалий: %d",

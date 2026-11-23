@@ -1,23 +1,43 @@
-"""Порт репозитория для хранения пользователей и поездок такси."""
+"""Порт репозитория для звездообразной модели аналитики такси."""
 
 from __future__ import annotations
 
 from typing import Protocol
 
-from generator.models import Trip, User
+from generator.models import DimDate, DimTime, Tarif, Taxist, Trip, User, Weather
 
 
 class Repository(Protocol):
-    """Контракт хранилища, от которого зависит сервис генерации."""
+    """Контракт batch-хранилища справочников и фактов поездок."""
 
     def ensure_schema(self) -> None:
-        """Подготовить структуру хранилища к записи данных."""
+        """Создать структуру хранилища, если её ещё нет."""
         ...
 
     def upsert_users(self, users: list[User]) -> None:
-        """Сохранить пачку пользователей и водителей."""
+        """Сохранить справочник пассажиров."""
+        ...
+
+    def upsert_taxists(self, taxists: list[Taxist]) -> None:
+        """Сохранить справочник водителей."""
+        ...
+
+    def upsert_tarifs(self, tarifs: list[Tarif]) -> None:
+        """Сохранить справочник тарифов."""
+        ...
+
+    def upsert_weathers(self, weathers: list[Weather]) -> None:
+        """Сохранить справочник погодных условий."""
+        ...
+
+    def upsert_dates(self, dates: list[DimDate]) -> None:
+        """Сохранить измерение дат."""
+        ...
+
+    def upsert_times(self, times: list[DimTime]) -> None:
+        """Сохранить измерение времени."""
         ...
 
     def insert_trips(self, trips: list[Trip]) -> None:
-        """Сохранить пачку фактов поездок одним batch-вызовом."""
+        """Сохранить batch фактов поездок."""
         ...
