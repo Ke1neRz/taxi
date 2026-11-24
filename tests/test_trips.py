@@ -1,5 +1,5 @@
 import random
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -65,6 +65,19 @@ def test_long_trip_anomaly_increases_duration() -> None:
 
     assert anomalous_trip.is_anomaly is True
     assert anomalous_trip.travel_time_seconds > normal_trip.travel_time_seconds
+
+
+def test_sequence_uses_requested_step() -> None:
+    generator = _generator(AnomalyPolicy(0.0, 2.0, random.Random(12)))
+    at = datetime(2026, 1, 5, 8, tzinfo=UTC)
+
+    batch = generator.generate_sequence(at, 3, 60.0)
+
+    assert [trip.datetime_start for trip in batch] == [
+        at,
+        at.replace(second=0) + timedelta(seconds=60),
+        at.replace(second=0) + timedelta(seconds=120),
+    ]
 
 
 def test_batch_size_must_be_positive() -> None:

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from functools import lru_cache
 
 from pydantic import Field
@@ -40,6 +41,9 @@ class GeneratorSettings(BaseSettings):
 
     batch_size: int = Field(default=100, ge=1)
     interval_seconds: float = Field(default=1.0, ge=0.0)
+    backfill_start: str = Field(default="2025-01-01T00:00:00")
+    backfill_step_seconds: float = Field(default=60.0, ge=0.1)
+    realtime_step_seconds: float = Field(default=1.0, ge=0.1)
     seed: int = Field(default=42)
     anomaly_probability: float = Field(default=0.02, ge=0.0, le=1.0)
     anomaly_strength: float = Field(default=3.0, ge=0.0)
@@ -57,6 +61,15 @@ class GeneratorSettings(BaseSettings):
         """Разделить значение из env со списком через запятую на элементы."""
 
         return [item.strip() for item in value.split(",") if item.strip()]
+
+    @property
+    def backfill_start_dt(self) -> datetime:
+        """Вернуть начало бэкфилла как UTC datetime."""
+
+        parsed = datetime.fromisoformat(self.backfill_start)
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=UTC)
+        return parsed
 
     @property
     def city_list(self) -> list[str]:

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Protocol
 
 from generator.models import DimDate, DimTime, Tarif, Taxist, Trip, User, Weather
@@ -36,6 +37,10 @@ class Repository(Protocol):
 
     def upsert_times(self, times: list[DimTime]) -> None:
         """Сохранить измерение времени."""
+        ...
+
+    def max_timestamp(self) -> datetime | None:
+        """Вернуть последний timestamp фактов или None при пустом хранилище."""
         ...
 
     def insert_trips(self, trips: list[Trip]) -> None:

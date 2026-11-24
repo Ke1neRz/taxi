@@ -42,6 +42,23 @@ def _service() -> tuple[GeneratorService, InMemoryRepository]:
     return service, repository
 
 
+def test_backfill_writes_historical_batches_until_clock() -> None:
+    service, repository = _service()
+    service._settings.generator.backfill_start = "2026-01-05T07:58:00"
+    service._clock = lambda: datetime(2026, 1, 5, 8, tzinfo=UTC)
+
+    service._repository.ensure_schema()
+    service._write_users()
+    service._backfill()
+
+    assert repository.trips
+    assert repository.trips[-1].datetime_start <= datetime(2026, 1, 5, 8, tzinfo=UTC)
+    assert all(
+        trip.datetime_start >= service._settings.generator.backfill_start_dt
+        for trip in repository.trips
+    )
+
+
 def test_run_once_writes_users_and_trip_batch() -> None:
     service, repository = _service()
 

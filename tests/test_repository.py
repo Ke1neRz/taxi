@@ -54,6 +54,7 @@ def test_in_memory_repository_upserts_users_and_inserts_trip_batch() -> None:
     assert len(repository.users) == 2
     assert repository.users[0].id == 1
     assert len(repository.trips) == 1
+    assert repository.max_timestamp() == repository.trips[0].datetime_start
     assert repository.trips[0].taxist_id == 2
 
 

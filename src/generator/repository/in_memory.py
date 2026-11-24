@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any
 
 from generator.models import DimDate, DimTime, Tarif, Taxist, Trip, User, Weather
@@ -53,6 +54,13 @@ class InMemoryRepository:
         """Добавить или заменить время по id."""
 
         self.times = self._upsert(self.times, times)
+
+    def max_timestamp(self) -> datetime | None:
+        """Вернуть максимальную временную метку из фактов в памяти."""
+
+        if not self.trips:
+            return None
+        return max(trip.datetime_start for trip in self.trips)
 
     def insert_trips(self, trips: list[Trip]) -> None:
         """Добавить факты поездок одной batch-пачкой."""

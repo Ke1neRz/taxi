@@ -58,6 +58,20 @@ class TripBatchGenerator:
             self._generate_trip(at + timedelta(seconds=index)) for index in range(size)
         ]
 
+    def generate_sequence(
+        self, start: datetime, size: int, step_seconds: float
+    ) -> list[Trip]:
+        """Создать последовательность поездок с заданным шагом времени."""
+
+        if size < 1:
+            raise ValueError("размер batch должен быть положительным")
+        if step_seconds < 0.1:
+            raise ValueError("шаг времени должен быть не меньше 0.1 секунды")
+        return [
+            self._generate_trip(start + timedelta(seconds=index * step_seconds))
+            for index in range(size)
+        ]
+
     def dimensions_for(self, at: datetime) -> tuple[DimDate, DimTime]:
         """Вернуть измерения даты и времени для указанной метки."""
 

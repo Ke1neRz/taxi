@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any
 
 import clickhouse_connect
@@ -71,7 +72,8 @@ class ClickHouseRepository(Repository):
                 "datetime_start DateTime64(3, 'UTC'), datetime_end DateTime64(3, 'UTC'), "
                 "child_seat UInt8, pets UInt8, rating Float32, cost Float64, "
                 "distance_km Float64, travel_time_seconds UInt32, taxist_count UInt32, "
-                "is_anomaly UInt8, weather_category LowCardinality(String), tarif_name LowCardinality(String)"
+                "is_anomaly UInt8, weather_category LowCardinality(String), "
+                "tarif_name LowCardinality(String)"
             ),
         }
         order_by = {
@@ -149,7 +151,8 @@ class ClickHouseRepository(Repository):
                 "arrayElement(['понедельник', 'вторник', 'среда', 'четверг', "
                 "'пятница', 'суббота', 'воскресенье'], "
                 "toDayOfWeek(datetime_start, 1)) AS day_of_week, "
-                "multiIf(toDayOfWeek(datetime_start, 1) >= 6, 'выходные', 'будни') AS part_of_week, "
+                "multiIf(toDayOfWeek(datetime_start, 1) >= 6, "
+                "'выходные', 'будни') AS part_of_week, "
                 "countState() AS count_trip, "
                 "avgState(travel_time_seconds) AS avg_travel_time, avgState(cost) AS average_cost",
                 f"FROM {database}.trips "
@@ -304,6 +307,14 @@ class ClickHouseRepository(Repository):
             ["id", "hour", "minute", "part_of_day"],
             [(item.id, item.hour, item.minute, item.part_of_day) for item in times],
         )
+
+    def max_timestamp(self) -> datetime | None:
+        """Вернуть максимальный datetime_start фактов ClickHouse."""
+
+        value = self._conn().query(
+            f"SELECT max(datetime_start) FROM {self._settings.database}.trips"
+        ).result_rows[0][0]
+        return value if isinstance(value, datetime) else None
 
     def insert_trips(self, trips: list[Trip]) -> None:
         """Вставить batch фактов поездок с координатами маршрута."""
