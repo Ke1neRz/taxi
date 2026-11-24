@@ -16,7 +16,9 @@ uv run pytest
 
 ```bash
 uv run python demos/01_in_memory.py
-uv run python demos/02_control_api.py
+uv run python demos/02_to_clickhouse.py
+uv run python demos/03_wait_for_clickhouse.py
+uv run python demos/04_control_api.py
 ```
 
 Для непрерывного запуска с ClickHouse используйте `docker compose up --build`.
