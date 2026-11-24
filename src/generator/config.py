@@ -55,6 +55,8 @@ class GeneratorSettings(BaseSettings):
     retry_base_delay_seconds: float = Field(default=0.5, ge=0.0)
     retry_max_delay_seconds: float = Field(default=30.0, ge=0.0)
     retry_backoff_factor: float = Field(default=2.0, ge=1.0)
+    control_host: str = Field(default="0.0.0.0")
+    control_port: int = Field(default=8080, ge=1, le=65535)
 
     @staticmethod
     def _split_values(value: str) -> list[str]:
