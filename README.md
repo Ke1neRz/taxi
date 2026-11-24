@@ -3,7 +3,7 @@
 Учебный end-to-end проект потоковой аналитики поездок на такси.
 
 На текущем этапе создан базовый Python-каркас генератора:
-модели, env-конфигурация и тесты. 
+модели, env-конфигурация, backfill/realtime-цикл и HTTP-контроль остановки.
 
 ## Local development
 
@@ -11,3 +11,16 @@
 uv sync
 uv run pytest
 ```
+
+## Generator demos
+
+```bash
+uv run python demos/01_in_memory.py
+uv run python demos/02_to_clickhouse.py
+uv run python demos/03_wait_for_clickhouse.py
+uv run python demos/04_control_api.py
+```
+
+Для непрерывного запуска с ClickHouse используйте `docker compose up --build`.
+Состояние генератора доступно по `GET http://localhost:8080/health`, остановка —
+по `POST http://localhost:8080/stop`.

@@ -1,0 +1,13 @@
+.git/
+.venv/
+.env
+AGENTS.md
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+PLAN/
+tests/
+*.md
+!README.md

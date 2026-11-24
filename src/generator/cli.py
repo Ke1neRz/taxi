@@ -11,6 +11,7 @@ from collections.abc import Sequence
 from datetime import UTC, datetime
 
 from generator.config import get_settings
+from generator.control import ControlServer
 from generator.generation.anomalies import AnomalyPolicy
 from generator.generation.catalog import TaxiCatalog
 from generator.generation.trips import TripBatchGenerator
@@ -45,9 +46,7 @@ def _parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
 
     parser = argparse.ArgumentParser(prog="taxi-generator")
     parser.add_argument("--once", action="store_true", help="записать один batch и выйти")
-    parser.add_argument(
-        "--repository", choices=("in-memory", "clickhouse"), default="in-memory"
-    )
+    parser.add_argument("--repository", choices=("in-memory", "clickhouse"), default="in-memory")
     return parser.parse_args(argv)
 
 
@@ -92,7 +91,16 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.once:
         service.run_once()
     else:
-        service.run()
+        control = ControlServer(
+            settings.generator.control_host,
+            settings.generator.control_port,
+            stop_event,
+        )
+        control.start()
+        try:
+            service.run()
+        finally:
+            control.close()
     return 0
 
 

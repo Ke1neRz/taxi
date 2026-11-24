@@ -1,34 +1,27 @@
-"""Детерминированные справочники для генерации поездок такси."""
+"""Детерминированные справочники звездообразной модели такси."""
 
 from __future__ import annotations
 
 import random
-from dataclasses import dataclass
+from datetime import datetime, time
 
-from generator.models import Route, Tarif, User, Weather
+from generator.models import DimDate, DimTime, GeoPoint, Route, Tarif, Taxist, User, Weather
 
-_NAMES = ("Ivan", "Anna", "Pavel", "Maria", "Sergey", "Elena")
-_SURNAMES = ("Petrov", "Sokolov", "Smirnova", "Volkov", "Kuznetsov", "Orlova")
-_GENDERS = ("male", "female")
-_POINT_TYPES = ("Center", "Station", "Mall", "Airport")
-
-
-@dataclass(frozen=True, slots=True)
-class _CityPoint:
-    """Именованная точка маршрута, связанная с городом."""
-
-    city: str
-    point_type: str
-
-    @property
-    def label(self) -> str:
-        """Вернуть отображаемое имя точки для факта поездки."""
-
-        return f"{self.city} {self.point_type}"
+_NAMES = ("Иван", "Анна", "Павел", "Мария", "Сергей", "Елена")
+_SURNAMES = ("Петров", "Соколов", "Смирнова", "Волков", "Кузнецов", "Орлова")
+_GENDERS = ("мужчина", "женщина")
+_CAR_MODELS = ("Lada Vesta", "Kia Rio", "Hyundai Solaris", "Toyota Camry")
+_WEATHER_DATA = {
+    "clear": ("ясно", 21.0, "нет", 3.0, 45),
+    "cloudy": ("облачно", 15.0, "нет", 4.0, 60),
+    "rain": ("дождь", 10.0, "дождь", 6.0, 80),
+    "snow": ("снег", -4.0, "снег", 5.0, 75),
+}
+_DAY_NAMES = ("понедельник", "вторник", "среда", "четверг", "пятница", "суббота", "воскресенье")
 
 
 class TaxiCatalog:
-    """Создать пользователей, водителей, маршруты и измерения поездки."""
+    """Создать справочники пользователей, таксистов, тарифов и погоды."""
 
     def __init__(
         self,
@@ -38,104 +31,168 @@ class TaxiCatalog:
         user_count: int = 100,
         seed: int = 42,
     ) -> None:
-        """Создать детерминированный каталог из настроек предметной области."""
+        """Создать воспроизводимый набор справочных данных."""
 
         if not cities:
-            raise ValueError("at least one city is required")
-        if user_count < 2:
-            raise ValueError("at least two users are required")
-
+            raise ValueError("необходим хотя бы один город")
+        if user_count < 1:
+            raise ValueError("количество пользователей должно быть положительным")
         self._rng = random.Random(seed)
-        self._tariffs = tuple(Tarif(value) for value in tariffs)
-        self._weather_types = tuple(Weather(value) for value in weather_types)
-        if not self._tariffs or not self._weather_types:
-            raise ValueError("tariffs and weather types must not be empty")
-
         self._users = tuple(self._build_users(user_count))
-        self._drivers = tuple(user for user in self._users if user.is_taxist)
+        self._taxists = tuple(self._build_taxists(max(1, user_count // 5)))
+        self._tarifs = tuple(self._build_tarifs(tariffs))
+        self._weathers = tuple(self._build_weathers(weather_types))
         self._routes = tuple(self._build_routes(cities))
-        if not self._drivers or not self._routes:
-            raise ValueError("catalog must contain drivers and routes")
+        if not self._tarifs or not self._weathers or not self._routes:
+            raise ValueError("справочники тарифов, погоды и маршрутов не должны быть пустыми")
 
     def users(self) -> list[User]:
-        """Вернуть всех сгенерированных пользователей, включая водителей."""
+        """Вернуть справочник пассажиров."""
 
         return list(self._users)
 
-    def drivers(self) -> list[User]:
-        """Вернуть пользователей, допустимых для связи через taxist_id."""
+    def taxists(self) -> list[Taxist]:
+        """Вернуть справочник водителей."""
 
-        return list(self._drivers)
+        return list(self._taxists)
+
+    def tarifs(self) -> list[Tarif]:
+        """Вернуть справочник тарифов."""
+
+        return list(self._tarifs)
+
+    def weathers(self) -> list[Weather]:
+        """Вернуть справочник погоды."""
+
+        return list(self._weathers)
 
     def routes(self) -> list[Route]:
-        """Вернуть детерминированный справочник маршрутов."""
+        """Вернуть справочник маршрутов."""
 
         return list(self._routes)
 
     def random_user(self) -> User:
-        """Выбрать воспроизводимого пассажира или водителя из каталога."""
+        """Выбрать пассажира из справочника."""
 
         return self._rng.choice(self._users)
 
-    def random_driver(self) -> User:
-        """Выбрать воспроизводимого водителя из каталога."""
+    def random_taxist(self) -> Taxist:
+        """Выбрать водителя из справочника."""
 
-        return self._rng.choice(self._drivers)
+        return self._rng.choice(self._taxists)
 
     def random_route(self) -> Route:
-        """Выбрать воспроизводимый маршрут с положительной дистанцией."""
+        """Выбрать маршрут из справочника."""
 
         return self._rng.choice(self._routes)
 
     def random_tarif(self) -> Tarif:
-        """Выбрать настроенную категорию тарифа."""
+        """Выбрать тариф из справочника."""
 
-        return self._rng.choice(self._tariffs)
+        return self._rng.choice(self._tarifs)
 
     def random_weather(self) -> Weather:
-        """Выбрать настроенную категорию погоды для поездки."""
+        """Выбрать погоду из справочника."""
 
-        return self._rng.choice(self._weather_types)
+        return self._rng.choice(self._weathers)
 
-    def _build_users(self, user_count: int) -> list[User]:
-        """Создать пользователей и отметить часть из них водителями."""
+    @staticmethod
+    def date_dimension(at: datetime) -> DimDate:
+        """Построить измерение даты для временной метки."""
 
-        users: list[User] = []
-        driver_count = max(1, user_count // 5)
-        driver_ids = set(self._rng.sample(range(1, user_count + 1), driver_count))
+        current = at.date()
+        return DimDate(
+            id=int(current.strftime("%Y%m%d")),
+            date_value=current,
+            day=current.day,
+            month=current.month,
+            year=current.year,
+            day_of_week=_DAY_NAMES[current.weekday()],
+            week=current.isocalendar().week,
+            quarter=(current.month - 1) // 3 + 1,
+        )
 
-        for user_id in range(1, user_count + 1):
-            users.append(
-                User(
-                    id=user_id,
-                    name=self._rng.choice(_NAMES),
-                    second_name=self._rng.choice(_SURNAMES),
-                    count_trips=self._rng.randint(0, 500),
-                    rating=round(self._rng.uniform(3.8, 5.0), 2),
-                    phone_number=f"+7000{user_id:07d}",
-                    gender=self._rng.choice(_GENDERS),
-                    is_taxist=user_id in driver_ids,
-                    balance=round(self._rng.uniform(0.0, 10000.0), 2),
-                )
+    @staticmethod
+    def time_dimension(at: datetime) -> DimTime:
+        """Построить измерение времени для временной метки."""
+
+        hour = at.hour
+        part = "ночь" if hour < 6 else "утро" if hour < 12 else "день" if hour < 18 else "вечер"
+        return DimTime(
+            id=hour * 60 + at.minute,
+            time_value=time(hour, at.minute),
+            hour=hour,
+            minute=at.minute,
+            part_of_day=part,
+        )
+
+    def _build_users(self, count: int) -> list[User]:
+        """Создать пользователей с реалистичными базовыми атрибутами."""
+
+        return [
+            User(
+                id=index,
+                name=self._rng.choice(_NAMES),
+                second_name=self._rng.choice(_SURNAMES),
+                count_trips=self._rng.randint(0, 500),
+                rating=round(self._rng.uniform(3.8, 5.0), 2),
+                phone_number=f"+7000{index:07d}",
+                gender=self._rng.choice(_GENDERS),
             )
-        return users
+            for index in range(1, count + 1)
+        ]
+
+    def _build_taxists(self, count: int) -> list[Taxist]:
+        """Создать отдельный справочник водителей и автомобилей."""
+
+        return [
+            Taxist(
+                id=index,
+                name=self._rng.choice(_NAMES),
+                second_name=self._rng.choice(_SURNAMES),
+                phone_number=f"+7999{index:07d}",
+                gender=self._rng.choice(_GENDERS),
+                rating=round(self._rng.uniform(4.0, 5.0), 2),
+                license_number=f"LIC-{index:08d}",
+                car_model=self._rng.choice(_CAR_MODELS),
+                car_number=f"A{index:03d}AA",
+                experience=self._rng.randint(1, 25),
+            )
+            for index in range(1, count + 1)
+        ]
+
+    @staticmethod
+    def _build_tarifs(names: list[str]) -> list[Tarif]:
+        """Создать тарифы с базовой ценой и ценой километра."""
+
+        defaults = {"economy": (180.0, 32.0), "comfort": (260.0, 45.0), "business": (400.0, 70.0)}
+        return [
+            Tarif(
+                id=index,
+                name=name,
+                base_cost=defaults.get(name, (200.0, 35.0))[0],
+                cost_per_km=defaults.get(name, (200.0, 35.0))[1],
+                description=f"Тариф {name}",
+            )
+            for index, name in enumerate(names, start=1)
+        ]
+
+    @staticmethod
+    def _build_weathers(names: list[str]) -> list[Weather]:
+        """Создать погодные категории с измерениями условий поездки."""
+
+        return [
+            Weather(index, *_WEATHER_DATA.get(name, (name, 12.0, "нет", 4.0, 60)))
+            for index, name in enumerate(names, start=1)
+        ]
 
     @staticmethod
     def _build_routes(cities: list[str]) -> list[Route]:
-        """Создать шаблоны маршрутов из городских точек."""
+        """Создать маршруты с координатами выбранных городов."""
 
-        points = [_CityPoint(city, point_type) for city in cities for point_type in _POINT_TYPES]
         routes: list[Route] = []
-        for index, start in enumerate(points):
-            end = points[(index + 3) % len(points)]
-            if start.label == end.label:
-                continue
-            routes.append(
-                Route(
-                    start_point=start.label,
-                    end_point=end.label,
-                    intermediate_point=None,
-                    distance=round(2.5 + (index % 18) * 1.7, 2),
-                )
-            )
+        for index, _city in enumerate(cities, start=1):
+            start = GeoPoint(55.0 + index * 0.1, 37.0 + index * 0.1)
+            end = GeoPoint(start.latitude + 0.05, start.longitude + 0.08)
+            routes.append(Route(start, end, (), round(3.0 + index * 2.5, 2)))
         return routes

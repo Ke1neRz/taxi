@@ -1,0 +1,50 @@
+services:
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.8
+    container_name: clickhouse
+    restart: unless-stopped
+    ports:
+      - "${CLICKHOUSE_PORT:-8123}:8123"
+      - "${CLICKHOUSE_NATIVE_PORT:-9000}:9000"
+    environment:
+      CLICKHOUSE_DB: "${CLICKHOUSE_DATABASE:-taxi}"
+      CLICKHOUSE_USER: "${CLICKHOUSE_USER:-default}"
+      CLICKHOUSE_PASSWORD: "${CLICKHOUSE_PASSWORD:-}"
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+      - clickhouse_logs:/var/log/clickhouse-server
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8123/ping || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
+  generator:
+    build: .
+    container_name: taxi-generator
+    restart: unless-stopped
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+    environment:
+      CLICKHOUSE_HOST: clickhouse
+      CLICKHOUSE_PORT: "8123"
+      CLICKHOUSE_DATABASE: "${CLICKHOUSE_DATABASE:-taxi}"
+      CLICKHOUSE_USER: "${CLICKHOUSE_USER:-default}"
+      CLICKHOUSE_PASSWORD: "${CLICKHOUSE_PASSWORD:-}"
+      GENERATOR_SEED: "${GENERATOR_SEED:-42}"
+      GENERATOR_BATCH_SIZE: "${GENERATOR_BATCH_SIZE:-100}"
+      GENERATOR_INTERVAL_SECONDS: "${GENERATOR_INTERVAL_SECONDS:-1.0}"
+      GENERATOR_ANOMALY_PROBABILITY: "${GENERATOR_ANOMALY_PROBABILITY:-0.02}"
+      GENERATOR_ANOMALY_STRENGTH: "${GENERATOR_ANOMALY_STRENGTH:-3.0}"
+      GENERATOR_CONTROL_HOST: "0.0.0.0"
+      GENERATOR_CONTROL_PORT: "${GENERATOR_CONTROL_PORT:-8080}"
+    command: ["python", "-m", "generator", "--repository", "clickhouse"]
+    ports:
+      - "${GENERATOR_CONTROL_PORT:-8080}:8080"
+
+volumes:
+  clickhouse_data:
+  clickhouse_logs:

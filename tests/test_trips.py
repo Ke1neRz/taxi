@@ -1,5 +1,5 @@
 import random
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -28,13 +28,13 @@ def test_trip_batch_contains_human_readable_metrics_and_links() -> None:
     generator = _generator(AnomalyPolicy(0.0, 2.0, random.Random(12)))
 
     batch = generator.generate_batch(datetime(2026, 1, 5, 8, tzinfo=UTC), 25)
-    driver_ids = {user.id for user in generator.users if user.is_taxist}
+    driver_ids = {taxist.id for taxist in generator.taxists}
 
     assert len(batch) == 25
     assert [trip.id for trip in batch] == list(range(1, 26))
     assert all(trip.user_id in {user.id for user in generator.users} for trip in batch)
     assert all(trip.taxist_id in driver_ids for trip in batch)
-    assert all(2.5 <= trip.distance <= 33.1 for trip in batch)
+    assert all(3.0 <= trip.distance_km <= 33.1 for trip in batch)
     assert all(trip.cost > 0.0 for trip in batch)
     assert all(0 < trip.travel_time_seconds < 7200 for trip in batch)
     assert all(1 <= trip.rating <= 5 for trip in batch)
@@ -65,6 +65,19 @@ def test_long_trip_anomaly_increases_duration() -> None:
 
     assert anomalous_trip.is_anomaly is True
     assert anomalous_trip.travel_time_seconds > normal_trip.travel_time_seconds
+
+
+def test_sequence_uses_requested_step() -> None:
+    generator = _generator(AnomalyPolicy(0.0, 2.0, random.Random(12)))
+    at = datetime(2026, 1, 5, 8, tzinfo=UTC)
+
+    batch = generator.generate_sequence(at, 3, 60.0)
+
+    assert [trip.datetime_start for trip in batch] == [
+        at,
+        at.replace(second=0) + timedelta(seconds=60),
+        at.replace(second=0) + timedelta(seconds=120),
+    ]
 
 
 def test_batch_size_must_be_positive() -> None:

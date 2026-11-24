@@ -6,10 +6,11 @@ import logging
 import threading
 import time
 from collections.abc import Callable
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from generator.config import Settings
 from generator.generation.trips import TripBatchGenerator
+from generator.models import Trip
 from generator.repository.base import Repository
 from generator.retry import RetryError, RetryPolicy
 
@@ -48,17 +49,76 @@ class GeneratorService:
         self._sleep = sleep
 
     def run(self) -> None:
-        """Запускать batch-цикл до graceful shutdown или RetryError."""
+        """Выполнить бэкфилл и затем непрерывную realtime-гнерацию."""
 
         self._repository.ensure_schema()
         self._write_users()
         try:
-            while not self._stop_event.is_set():
-                self._produce_and_store_batch()
+            self._backfill()
+            self._run_realtime()
         except RetryError as exc:
             logger.error("Запись данных не удалась: %s", exc)
         finally:
             logger.info("Генератор поездок остановлен.")
+
+    def _backfill(self) -> None:
+        """Заполнить исторический диапазон до текущего времени."""
+
+        settings = self._settings.generator
+        now = self._clock()
+        last = self._repository.max_timestamp()
+        next_timestamp = (
+            last + timedelta(seconds=settings.backfill_step_seconds)
+            if last is not None and last >= settings.backfill_start_dt
+            else settings.backfill_start_dt
+        )
+        while next_timestamp <= now and not self._stop_event.is_set():
+            remaining = (now - next_timestamp).total_seconds()
+            count = min(settings.batch_size, int(remaining // settings.backfill_step_seconds) + 1)
+            batch = self._batch_generator.generate_sequence(
+                next_timestamp, count, settings.backfill_step_seconds
+            )
+            self._store(batch)
+            next_timestamp = batch[-1].datetime_start + timedelta(
+                seconds=settings.backfill_step_seconds
+            )
+
+    def _run_realtime(self) -> None:
+        """Дописывать поездки с realtime-шагом после завершения бэкфилла."""
+
+        settings = self._settings.generator
+        last = self._repository.max_timestamp()
+        next_timestamp = (
+            last + timedelta(seconds=settings.realtime_step_seconds)
+            if last is not None
+            else self._clock()
+        )
+        while not self._stop_event.is_set():
+            now = self._clock()
+            if next_timestamp > now:
+                self._sleep(min(1.0, (next_timestamp - now).total_seconds()))
+                continue
+            batch = self._batch_generator.generate_sequence(
+                next_timestamp, 1, settings.realtime_step_seconds
+            )
+            self._store(batch)
+            next_timestamp += timedelta(seconds=settings.realtime_step_seconds)
+            self._sleep(settings.realtime_step_seconds)
+
+    def _store(self, batch: list[Trip]) -> None:
+        """Записать date/time dimensions и batch поездок через retry-policy."""
+
+        dates = {}
+        times = {}
+        for trip in batch:
+            date_dimension, time_dimension = self._batch_generator.dimensions_for(
+                trip.datetime_start
+            )
+            dates[date_dimension.id] = date_dimension
+            times[time_dimension.id] = time_dimension
+        self._retry.execute(lambda: self._repository.upsert_dates(list(dates.values())))
+        self._retry.execute(lambda: self._repository.upsert_times(list(times.values())))
+        self._retry.execute(lambda: self._repository.insert_trips(batch))
 
     def run_once(self) -> None:
         """Инициализировать хранилище и записать ровно один batch."""
@@ -68,9 +128,18 @@ class GeneratorService:
         self._produce_and_store_batch()
 
     def _write_users(self) -> None:
-        """Записать справочник пользователей через retry."""
+        """Записать статические справочники через retry."""
 
         self._retry.execute(lambda: self._repository.upsert_users(self._batch_generator.users))
+        self._retry.execute(
+            lambda: self._repository.upsert_taxists(self._batch_generator.taxists)
+        )
+        self._retry.execute(
+            lambda: self._repository.upsert_tarifs(self._batch_generator.tarifs)
+        )
+        self._retry.execute(
+            lambda: self._repository.upsert_weathers(self._batch_generator.weathers)
+        )
 
     def _produce_and_store_batch(self) -> None:
         """Создать и записать один batch поездок, соблюдая интервал."""
@@ -79,6 +148,16 @@ class GeneratorService:
         batch = self._batch_generator.generate_batch(
             self._clock(), self._settings.generator.batch_size
         )
+        dates = {}
+        times = {}
+        for trip in batch:
+            date_dimension, time_dimension = self._batch_generator.dimensions_for(
+                trip.datetime_start
+            )
+            dates[date_dimension.id] = date_dimension
+            times[time_dimension.id] = time_dimension
+        self._retry.execute(lambda: self._repository.upsert_dates(list(dates.values())))
+        self._retry.execute(lambda: self._repository.upsert_times(list(times.values())))
         self._retry.execute(lambda: self._repository.insert_trips(batch))
         logger.info(
             "Записано поездок: %d, аномалий: %d",

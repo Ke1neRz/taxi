@@ -1,32 +1,14 @@
-"""Чистые доменные модели пользователей и поездок такси."""
+"""Доменные модели звездообразной модели аналитики такси."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
-from enum import StrEnum
-
-
-class Tarif(StrEnum):
-    """Категория тарифа как измерение поездки."""
-
-    ECONOMY = "economy"
-    COMFORT = "comfort"
-    BUSINESS = "business"
-
-
-class Weather(StrEnum):
-    """Категория погоды, записанная во время поездки."""
-
-    CLEAR = "clear"
-    CLOUDY = "cloudy"
-    RAIN = "rain"
-    SNOW = "snow"
+from datetime import date, datetime, time
 
 
 @dataclass(frozen=True, slots=True)
 class User:
-    """Запись справочника пользователей; водитель имеет is_taxist=True."""
+    """Пассажир из справочника пользователей."""
 
     id: int
     name: str
@@ -35,44 +17,120 @@ class User:
     rating: float
     phone_number: str
     gender: str
-    is_taxist: bool
-    balance: float
+
+
+@dataclass(frozen=True, slots=True)
+class Taxist:
+    """Водитель из отдельного справочника таксистов."""
+
+    id: int
+    name: str
+    second_name: str
+    phone_number: str
+    gender: str
+    rating: float
+    license_number: str
+    car_model: str
+    car_number: str
+    experience: int
+
+
+@dataclass(frozen=True, slots=True)
+class Tarif:
+    """Тариф с базовой ценой и стоимостью километра."""
+
+    id: int
+    name: str
+    base_cost: float
+    cost_per_km: float
+    description: str
+
+
+@dataclass(frozen=True, slots=True)
+class Weather:
+    """Категория погоды и её измерения на момент поездки."""
+
+    id: int
+    weather: str
+    temperature: float
+    precipitation: str
+    wind_speed: float
+    humidity: int
+
+
+@dataclass(frozen=True, slots=True)
+class DimDate:
+    """Измерение календарной даты поездки."""
+
+    id: int
+    date_value: date
+    day: int
+    month: int
+    year: int
+    day_of_week: str
+    week: int
+    quarter: int
+
+
+@dataclass(frozen=True, slots=True)
+class DimTime:
+    """Измерение времени суток поездки."""
+
+    id: int
+    time_value: time
+    hour: int
+    minute: int
+    part_of_day: str
+
+
+@dataclass(frozen=True, slots=True)
+class GeoPoint:
+    """Координата точки маршрута."""
+
+    latitude: float
+    longitude: float
 
 
 @dataclass(frozen=True, slots=True)
 class Route:
-    """Справочный маршрут для создания реалистичных фактов поездок."""
+    """Справочный маршрут с координатами и расстоянием."""
 
-    start_point: str
-    end_point: str
-    intermediate_point: str | None
-    distance: float
+    start_point: GeoPoint
+    end_point: GeoPoint
+    intermediate_point: tuple[GeoPoint, ...]
+    distance_km: float
 
 
 @dataclass(frozen=True, slots=True)
 class Trip:
-    """Факт поездки такси с измерениями и метриками для MV."""
+    """Факт поездки со ссылками на справочники и измерения."""
 
     id: int
     user_id: int
     taxist_id: int
-    tarif: Tarif
-    weather: Weather
-    start_point: str
-    end_point: str
-    intermediate_point: str | None
-    distance: float
+    tarif_id: int
+    weather_id: int
+    date_start_id: int
+    time_start_id: int
+    date_end_id: int
+    time_end_id: int
+    start_point: GeoPoint
+    end_point: GeoPoint
+    intermediate_point: tuple[GeoPoint, ...]
     datetime_start: datetime
     datetime_end: datetime
     child_seat: bool
     pets: bool
     rating: float
     cost: float
+    distance_km: float
     taxist_count: int
     is_anomaly: bool = False
+    weather_category: str = ""
+    tarif_name: str = ""
 
     @property
     def travel_time_seconds(self) -> int:
-        """Вернуть неотрицательную длительность поездки в целых секундах."""
+        """Вернуть длительность поездки в целых секундах."""
 
         return max(0, int((self.datetime_end - self.datetime_start).total_seconds()))
