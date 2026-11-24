@@ -1,6 +1,9 @@
 from datetime import UTC, datetime, timedelta
+from unittest.mock import MagicMock, patch
 
+from generator.config import ClickHouseSettings
 from generator.models import GeoPoint, Trip, User
+from generator.repository.clickhouse import ClickHouseRepository
 from generator.repository.in_memory import InMemoryRepository
 
 
@@ -52,3 +55,41 @@ def test_in_memory_repository_upserts_users_and_inserts_trip_batch() -> None:
     assert repository.users[0].id == 1
     assert len(repository.trips) == 1
     assert repository.trips[0].taxist_id == 2
+
+
+def test_clickhouse_repository_creates_four_materialized_views() -> None:
+    client = MagicMock()
+
+    with patch(
+        "generator.repository.clickhouse.clickhouse_connect.get_client",
+        return_value=client,
+    ):
+        repository = ClickHouseRepository(ClickHouseSettings(database="taxi"))
+        repository.ensure_schema()
+
+    commands = [call.args[0] for call in client.command.call_args_list]
+    for table_name in (
+        "trips_by_hour",
+        "trips_by_weekday",
+        "trips_by_weather",
+        "trips_by_tarif",
+    ):
+        assert any(f"{table_name}" in command for command in commands)
+        assert any("MATERIALIZED VIEW" in command for command in commands)
+    assert sum("AggregatingMergeTree" in command for command in commands) == 4
+
+
+def test_clickhouse_repository_inserts_trip_batch_once() -> None:
+    client = MagicMock()
+
+    with patch(
+        "generator.repository.clickhouse.clickhouse_connect.get_client",
+        return_value=client,
+    ):
+        repository = ClickHouseRepository(ClickHouseSettings(database="taxi"))
+        repository.insert_trips([_trip(1, user_id=1, taxist_id=2)])
+
+    client.insert.assert_called_once()
+    table_name, rows, = client.insert.call_args.args
+    assert table_name == "taxi.trips"
+    assert len(rows) == 1

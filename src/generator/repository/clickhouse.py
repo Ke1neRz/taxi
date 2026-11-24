@@ -92,6 +92,94 @@ class ClickHouseRepository(Repository):
                 f"ENGINE = MergeTree{partition} ORDER BY {order_by[table]}"
             )
 
+        aggregations = {
+            "trips_by_hour": (
+                "hour_start UInt8, part_of_day LowCardinality(String), "
+                "count_trip AggregateFunction(count), "
+                "avg_travel_time AggregateFunction(avg, UInt32), "
+                "avg_count_taxist AggregateFunction(avg, UInt32), "
+                "average_cost AggregateFunction(avg, Float64)",
+                "hour_start",
+            ),
+            "trips_by_weekday": (
+                "day_of_week LowCardinality(String), part_of_week LowCardinality(String), "
+                "count_trip AggregateFunction(count), "
+                "avg_travel_time AggregateFunction(avg, UInt32), "
+                "average_cost AggregateFunction(avg, Float64)",
+                "day_of_week",
+            ),
+            "trips_by_weather": (
+                "weather LowCardinality(String), count_trip AggregateFunction(count), "
+                "avg_travel_time AggregateFunction(avg, UInt32), "
+                "avg_count_taxist AggregateFunction(avg, UInt32), "
+                "average_cost AggregateFunction(avg, Float64)",
+                "weather",
+            ),
+            "trips_by_tarif": (
+                "tarif LowCardinality(String), count_trip AggregateFunction(count), "
+                "avg_travel_time AggregateFunction(avg, UInt32), "
+                "average_cost AggregateFunction(avg, Float64), "
+                "avg_count_taxist AggregateFunction(avg, UInt32)",
+                "tarif",
+            ),
+        }
+        for table, (columns, key) in aggregations.items():
+            client.command(
+                f"CREATE TABLE IF NOT EXISTS {database}.{table} ({columns}) "
+                f"ENGINE = AggregatingMergeTree ORDER BY {key}"
+            )
+
+        materialized_views = (
+            (
+                "trips_by_hour_mv",
+                "trips_by_hour",
+                "dt.hour AS hour_start, dt.part_of_day AS part_of_day, countState() AS count_trip, "
+                "avgState(travel_time_seconds) AS avg_travel_time, "
+                "avgState(taxist_count) AS avg_count_taxist, avgState(cost) AS average_cost",
+                f"FROM {database}.trips AS t "
+                f"INNER JOIN {database}.dim_time AS dt ON dt.id = t.time_start_id "
+                "GROUP BY dt.hour, dt.part_of_day",
+            ),
+            (
+                "trips_by_weekday_mv",
+                "trips_by_weekday",
+                "dd.day_of_week AS day_of_week, "
+                "multiIf(dd.day_of_week IN ('суббота', 'воскресенье'), "
+                "'выходные', 'будни') AS part_of_week, "
+                "countState() AS count_trip, "
+                "avgState(travel_time_seconds) AS avg_travel_time, avgState(cost) AS average_cost",
+                f"FROM {database}.trips AS t "
+                f"INNER JOIN {database}.dim_date AS dd ON dd.id = t.date_start_id "
+                "GROUP BY dd.day_of_week, "
+                "multiIf(dd.day_of_week IN ('суббота', 'воскресенье'), 'выходные', 'будни')",
+            ),
+            (
+                "trips_by_weather_mv",
+                "trips_by_weather",
+                "w.weather AS weather, countState() AS count_trip, "
+                "avgState(travel_time_seconds) AS avg_travel_time, "
+                "avgState(taxist_count) AS avg_count_taxist, avgState(cost) AS average_cost",
+                f"FROM {database}.trips AS t "
+                f"INNER JOIN {database}.weather AS w ON w.id = t.weather_id "
+                "GROUP BY w.weather",
+            ),
+            (
+                "trips_by_tarif_mv",
+                "trips_by_tarif",
+                "tf.name AS tarif, countState() AS count_trip, "
+                "avgState(travel_time_seconds) AS avg_travel_time, "
+                "avgState(cost) AS average_cost, avgState(taxist_count) AS avg_count_taxist",
+                f"FROM {database}.trips AS t "
+                f"INNER JOIN {database}.tarifs AS tf ON tf.id = t.tarif_id "
+                "GROUP BY tf.name",
+            ),
+        )
+        for mv_name, target, select_columns, source in materialized_views:
+            client.command(
+                f"CREATE MATERIALIZED VIEW IF NOT EXISTS {database}.{mv_name} "
+                f"TO {database}.{target} AS SELECT {select_columns} {source}"
+            )
+
     def _insert(
         self, table: str, columns: list[str], rows: list[tuple[Any, ...]]
     ) -> None:
