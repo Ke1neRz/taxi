@@ -111,6 +111,8 @@ class TripBatchGenerator:
             distance_km=route.distance_km,
             taxist_count=taxist_count,
             is_anomaly=anomaly is not None,
+            weather_category=weather.weather,
+            tarif_name=tarif.name,
         )
         self._next_trip_id += 1
         return trip

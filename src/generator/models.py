@@ -126,6 +126,8 @@ class Trip:
     distance_km: float
     taxist_count: int
     is_anomaly: bool = False
+    weather_category: str = ""
+    tarif_name: str = ""
 
     @property
     def travel_time_seconds(self) -> int:

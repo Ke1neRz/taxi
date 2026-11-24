@@ -1,13 +1,15 @@
-FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim
+FROM python:3.12-slim
 
 WORKDIR /app
 
 ENV PYTHONPATH=/app/src \
     PYTHONUNBUFFERED=1
 
-COPY pyproject.toml uv.lock ./
+COPY pyproject.toml ./
 COPY src ./src
 
-RUN uv sync --frozen --no-dev
+RUN pip install --no-cache-dir \
+        "clickhouse-connect>=0.8.0" \
+        "pydantic-settings>=2.6.0"
 
-CMD ["uv", "run", "python", "-m", "generator", "--repository", "clickhouse"]
+CMD ["python", "-m", "generator", "--repository", "clickhouse"]

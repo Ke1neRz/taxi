@@ -71,7 +71,7 @@ class ClickHouseRepository(Repository):
                 "datetime_start DateTime64(3, 'UTC'), datetime_end DateTime64(3, 'UTC'), "
                 "child_seat UInt8, pets UInt8, rating Float32, cost Float64, "
                 "distance_km Float64, travel_time_seconds UInt32, taxist_count UInt32, "
-                "is_anomaly UInt8"
+                "is_anomaly UInt8, weather_category LowCardinality(String), tarif_name LowCardinality(String)"
             ),
         }
         order_by = {
@@ -133,45 +133,45 @@ class ClickHouseRepository(Repository):
             (
                 "trips_by_hour_mv",
                 "trips_by_hour",
-                "dt.hour AS hour_start, dt.part_of_day AS part_of_day, countState() AS count_trip, "
+                "toHour(datetime_start) AS hour_start, "
+                "multiIf(toHour(datetime_start) < 6, 'ночь', "
+                "toHour(datetime_start) < 12, 'утро', "
+                "toHour(datetime_start) < 18, 'день', 'вечер') AS part_of_day, "
+                "countState() AS count_trip, "
                 "avgState(travel_time_seconds) AS avg_travel_time, "
                 "avgState(taxist_count) AS avg_count_taxist, avgState(cost) AS average_cost",
-                f"FROM {database}.trips AS t "
-                f"INNER JOIN {database}.dim_time AS dt ON dt.id = t.time_start_id "
-                "GROUP BY dt.hour, dt.part_of_day",
+                f"FROM {database}.trips "
+                "GROUP BY hour_start, part_of_day",
             ),
             (
                 "trips_by_weekday_mv",
                 "trips_by_weekday",
-                "dd.day_of_week AS day_of_week, "
-                "multiIf(dd.day_of_week IN ('суббота', 'воскресенье'), "
-                "'выходные', 'будни') AS part_of_week, "
+                "arrayElement(['понедельник', 'вторник', 'среда', 'четверг', "
+                "'пятница', 'суббота', 'воскресенье'], "
+                "toDayOfWeek(datetime_start, 1)) AS day_of_week, "
+                "multiIf(toDayOfWeek(datetime_start, 1) >= 6, 'выходные', 'будни') AS part_of_week, "
                 "countState() AS count_trip, "
                 "avgState(travel_time_seconds) AS avg_travel_time, avgState(cost) AS average_cost",
-                f"FROM {database}.trips AS t "
-                f"INNER JOIN {database}.dim_date AS dd ON dd.id = t.date_start_id "
-                "GROUP BY dd.day_of_week, "
-                "multiIf(dd.day_of_week IN ('суббота', 'воскресенье'), 'выходные', 'будни')",
+                f"FROM {database}.trips "
+                "GROUP BY day_of_week, part_of_week",
             ),
             (
                 "trips_by_weather_mv",
                 "trips_by_weather",
-                "w.weather AS weather, countState() AS count_trip, "
+                "weather_category AS weather, countState() AS count_trip, "
                 "avgState(travel_time_seconds) AS avg_travel_time, "
                 "avgState(taxist_count) AS avg_count_taxist, avgState(cost) AS average_cost",
-                f"FROM {database}.trips AS t "
-                f"INNER JOIN {database}.weather AS w ON w.id = t.weather_id "
-                "GROUP BY w.weather",
+                f"FROM {database}.trips "
+                "GROUP BY weather_category",
             ),
             (
                 "trips_by_tarif_mv",
                 "trips_by_tarif",
-                "tf.name AS tarif, countState() AS count_trip, "
+                "tarif_name AS tarif, countState() AS count_trip, "
                 "avgState(travel_time_seconds) AS avg_travel_time, "
                 "avgState(cost) AS average_cost, avgState(taxist_count) AS avg_count_taxist",
-                f"FROM {database}.trips AS t "
-                f"INNER JOIN {database}.tarifs AS tf ON tf.id = t.tarif_id "
-                "GROUP BY tf.name",
+                f"FROM {database}.trips "
+                "GROUP BY tarif_name",
             ),
         )
         for mv_name, target, select_columns, source in materialized_views:
@@ -334,6 +334,8 @@ class ClickHouseRepository(Repository):
                 item.travel_time_seconds,
                 item.taxist_count,
                 int(item.is_anomaly),
+                item.weather_category,
+                item.tarif_name,
             )
             for item in trips
         ]
@@ -364,6 +366,8 @@ class ClickHouseRepository(Repository):
                 "travel_time_seconds",
                 "taxist_count",
                 "is_anomaly",
+                "weather_category",
+                "tarif_name",
             ],
             rows,
         )
